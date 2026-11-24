@@ -8,9 +8,15 @@
     <Nullable>enable</Nullable>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TiaApiVersion Condition="'$(TiaApiVersion)' == ''">21.0</TiaApiVersion>
-    <DefaultTiaApiDirectory Condition="'$(TiaApiVersion)' == '21.0'">F:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48</DefaultTiaApiDirectory>
-    <DefaultTiaApiDirectory Condition="'$(TiaApiVersion)' == '21.1'">F:\Program Files\Siemens\Automation\Portal V21.1\PublicAPI\V21.1\net48</DefaultTiaApiDirectory>
-    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == ''">$(DefaultTiaApiDirectory)</TiaApiDirectory>
+    <_TiaApiRelative Condition="'$(TiaApiVersion)' == '21.0'">Siemens\Automation\Portal V21\PublicAPI\V21\net48</_TiaApiRelative>
+    <_TiaApiRelative Condition="'$(TiaApiVersion)' == '21.1'">Siemens\Automation\Portal V21.1\PublicAPI\V21.1\net48</_TiaApiRelative>
+    <!-- Prefer an explicit override, then the first Program Files root that actually contains the Openness assemblies. -->
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == '' And '$(SIEMENS_TIA_API_DIRECTORY)' != ''">$(SIEMENS_TIA_API_DIRECTORY)</TiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == '' And Exists('$(ProgramFiles)\$(_TiaApiRelative)\Siemens.Engineering.Base.dll')">$(ProgramFiles)\$(_TiaApiRelative)</TiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == '' And Exists('F:\Program Files\$(_TiaApiRelative)\Siemens.Engineering.Base.dll')">F:\Program Files\$(_TiaApiRelative)</TiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == '' And Exists('D:\Program Files\$(_TiaApiRelative)\Siemens.Engineering.Base.dll')">D:\Program Files\$(_TiaApiRelative)</TiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == '' And Exists('E:\Program Files\$(_TiaApiRelative)\Siemens.Engineering.Base.dll')">E:\Program Files\$(_TiaApiRelative)</TiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == ''">$(ProgramFiles)\$(_TiaApiRelative)</TiaApiDirectory>
     <DefineConstants Condition="'$(TiaApiVersion)' == '21.1'">$(DefineConstants);TIA_21_1</DefineConstants>
     <OutputPath>bin\$(Configuration)\$(TiaApiVersion)\</OutputPath>
     <IntermediateOutputPath>obj\$(Configuration)\$(TiaApiVersion)\</IntermediateOutputPath>

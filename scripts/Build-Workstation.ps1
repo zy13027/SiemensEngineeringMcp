@@ -2,8 +2,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [string]$Tia21ApiDirectory = 'F:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48',
-    [string]$Tia211ApiDirectory = 'F:\Program Files\Siemens\Automation\Portal V21.1\PublicAPI\V21.1\net48',
+    [string]$Tia21ApiDirectory,
+    [string]$Tia211ApiDirectory,
     [string]$PlcsimApiPath = 'C:\Program Files (x86)\Common Files\Siemens\PLCSIMADV\API\9.0\Siemens.Simatic.Simulation.Runtime.Api.x64.dll',
     [string]$PackageSource
 )
@@ -11,6 +11,29 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $bundle = Join-Path $root "artifacts\$Configuration\win-x64"
+
+function Resolve-TiaApiDirectory([string]$RelativePath) {
+    $candidates = @(
+        ([IO.Path]::Combine($env:ProgramFiles, $RelativePath)),
+        ([IO.Path]::Combine('F:\Program Files', $RelativePath)),
+        ([IO.Path]::Combine('D:\Program Files', $RelativePath)),
+        ([IO.Path]::Combine('E:\Program Files', $RelativePath))
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath ([IO.Path]::Combine($candidate, 'Siemens.Engineering.Base.dll')) -PathType Leaf) {
+            return $candidate
+        }
+    }
+
+    return $candidates[0]
+}
+
+if (-not $Tia21ApiDirectory) {
+    $Tia21ApiDirectory = Resolve-TiaApiDirectory 'Siemens\Automation\Portal V21\PublicAPI\V21\net48'
+}
+if (-not $Tia211ApiDirectory) {
+    $Tia211ApiDirectory = Resolve-TiaApiDirectory 'Siemens\Automation\Portal V21.1\PublicAPI\V21.1\net48'
+}
 
 function Build-Project([string]$Project, [string[]]$BuildProperties) {
     $arguments = @('build', (Join-Path $root "src\$Project\$Project.csproj"), '-c', $Configuration)

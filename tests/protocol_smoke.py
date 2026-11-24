@@ -37,6 +37,12 @@ def check(executable, profile):
                         "runtime_read", "operation_status", "engineering_save"}
             assert expected.issubset(catalogue), expected.difference(catalogue)
             assert "service" not in catalogue["sim_write"]["inputSchema"]["properties"]
+            for name in ("sim_write", "sim_wait"):
+                value_schema = catalogue[name]["inputSchema"]["properties"]["value"]
+                assert isinstance(value_schema, dict), (name, value_schema)
+                assert {variant.get("type") for variant in value_schema.get("anyOf", [])} == {
+                    "boolean", "number", "string"
+                }, (name, value_schema)
             request_id = "c45f684c-1246-4e8f-8655-ecd1be19dfef"
             for identifier, (name, arguments) in enumerate([
                 ("engineering_save", {"requestId": request_id}),

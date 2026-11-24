@@ -9,7 +9,7 @@ internal static class Program
     private const string PipeName = "HmiRuntime";
     private const int MaximumResponseBytes = 64 * 1024;
     private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(5);
-    private const string SiemensSample = @"F:\Program Files\Siemens\Automation\WinCCUnified\OpenPipe\Samples\Javascript\ExpertSyntax\ReadTags.js";
+    private static readonly string SiemensSample = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"Siemens\Automation\WinCCUnified\OpenPipe\Samples\Javascript\ExpertSyntax\ReadTags.js");
 
     private static int Main() => WorkerProtocol.Run(Dispatch);
 

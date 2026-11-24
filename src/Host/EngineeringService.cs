@@ -137,18 +137,26 @@ internal sealed class EngineeringService : IDisposable
     {
         if (record.Status == "running")
         {
-            try
+            FileStream? lease = null;
+            try { lease = OpenLease(RunningPath(record.RequestId)); }
+            catch (IOException error) when ((error.HResult & 0xFFFF) is 32 or 33)
             {
-                using var lease = OpenLease(RunningPath(record.RequestId));
-                record = ReadRecord(record.RequestId) ?? record;
-                if (record.Status == "running")
-                    record = record with
-                    {
-                        Status = "interrupted",
-                        Error = "Worker host exited before recording the outcome. Read back the target before applying another change."
-                    };
+                // The operation still owns its lease.
             }
-            catch (IOException) { /* The operation still owns its lease. */ }
+
+            if (lease != null)
+            {
+                using (lease)
+                {
+                    record = ReadRecord(record.RequestId) ?? record;
+                    if (record.Status == "running")
+                        record = record with
+                        {
+                            Status = "interrupted",
+                            Error = "Worker host exited before recording the outcome. Read back the target before applying another change."
+                        };
+                }
+            }
         }
 
         return Result(new { record.RequestId, record.Operation, record.Status, record.StartedAt, record.Data, record.Error },
@@ -194,10 +202,27 @@ internal sealed class EngineeringService : IDisposable
 
     private string RecordPath(Guid id) => Path.Combine(_journal, id.ToString("N") + ".json");
     private string RunningPath(Guid id) => Path.Combine(_journal, id.ToString("N") + ".running");
+    private string RecordLeasePath(Guid id) => Path.Combine(_journal, id.ToString("N") + ".record");
     private static FileStream OpenLease(string path) => new(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+    private FileStream OpenRecordLease(Guid id)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try { return OpenLease(RecordLeasePath(id)); }
+            catch (IOException error) when (attempt < 100 && (error.HResult & 0xFFFF) is 32 or 33)
+            {
+                Thread.Sleep(10);
+            }
+        }
+    }
 
     private OperationRecord? ReadRecord(Guid id)
     {
+        if (!File.Exists(RecordLeasePath(id)) && !File.Exists(RecordPath(id)))
+            return null;
+
+        using var lease = OpenRecordLease(id);
         try
         {
             using var input = new FileStream(RecordPath(id), FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
@@ -209,10 +234,14 @@ internal sealed class EngineeringService : IDisposable
 
     private void WriteRecord(OperationRecord record)
     {
+        using var lease = OpenRecordLease(record.RequestId);
         var destination = RecordPath(record.RequestId);
         var temporary = destination + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(record, WorkstationProfile.Json));
-        File.Move(temporary, destination, overwrite: true);
+        if (File.Exists(destination))
+            File.Replace(temporary, destination, null);
+        else
+            File.Move(temporary, destination);
     }
 
     private static CallToolResult Failure(string operation, Exception error) =>

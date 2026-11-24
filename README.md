@@ -1,45 +1,78 @@
 # Siemens Engineering MCP
 
-A standalone Windows x64 MCP server for TIA Portal V21 and V21.1, WinCC Unified engineering and PC Runtime, and PLCSIM Advanced V9. One workstation profile selects the engineering project, devices and disposable simulator. Tool calls return structured JSON and a text copy for clients that only display text.
+A Windows x64 Model Context Protocol (MCP) server for Siemens TIA Portal V21 and V21.1, WinCC Unified and PLCSIM Advanced V9. It connects an MCP client to a project and devices selected in a local workstation profile. The server uses stdio and returns structured JSON.
+
+| Area | Capabilities |
+| --- | --- |
+| TIA Portal Openness | Discover the configured project and PLC, read an SCL block, preview and apply a body-only change, compile, save and reopen for readback. |
+| WinCC Unified engineering | Discover connections, tags, screens and items. Preview and apply an external PLC tag binding on the `ProcessValue` property of an existing I/O field. Compile and read back the saved binding. |
+| PLCSIM Advanced V9 | Discover instances, use the exact configured instance name, refresh symbolic tags, read values, write allowlisted simulated inputs and wait for an expected value. |
+| WinCC Unified PC Runtime | Read permitted tags through local Open Pipe with value, quality and timestamps. |
+
+The workstation profile starts in inspection mode. Engineering writes and simulator writes are enabled separately. PLC and HMI downloads are performed manually.
+
+## Requirements
+
+- Windows x64, a .NET 10 SDK with the ASP.NET Core shared framework, and .NET Framework 4.8.
+- TIA Portal V21 and V21.1 with the matching Openness PublicAPI assemblies for the full build. Give the Windows account used by the MCP host Siemens Openness access.
+- PLCSIM Advanced V9 x64 API for the simulation worker. A compatible local Unified PC Runtime is required for live Open Pipe checks.
+- Python 3 for the regression scripts. Siemens products and licences are installed separately.
 
 ## Build and configure
 
-Use an installed .NET SDK capable of targeting .NET 10, the .NET 10 ASP.NET Core Runtime, .NET Framework 4.8, the two TIA PublicAPI SDKs and the PLCSIM Advanced V9 x64 SDK. Provision Siemens Openness access for the Windows user before attaching a project. The build uses local Siemens assemblies without packaging them. Licensed engineering and runtime checks require the relevant Siemens installations and licences.
+From the repository root in PowerShell, build the workstation bundle and copy the inspection profile:
 
 ```powershell
 .\scripts\Build-Workstation.ps1
 Copy-Item .\samples\workstation.example.json .\samples\workstation.local.json
 ```
 
-Edit the local profile to point at the fixture project and a dedicated virtual PLC. Set both `tiaVersion` and `tiaApiDirectory` to their matching release. V21.1 uses its `PublicAPI\V21.1\net48` directory. An optional `--tia-version 21.0|21.1` overrides the profile version, and the directory must still match.
+If the SDKs are installed outside the default directories, pass `-Tia21ApiDirectory`, `-Tia211ApiDirectory` and, when needed, `-PlcsimApiPath` to the build script. Keep the `workers` directory next to `artifacts\Release\win-x64\SiemensEngineeringMcp.exe`. Disconnect clients using that bundle before rebuilding it in place.
 
-Use an explicitly selected Portal process ID for inspection of a project already open in the GUI. Leave that field null for a privately opened project. Use a separate write-enabled profile for an offline, disposable copy with the project closed in other applications. Enable `allowEngineeringWrite` and `allowSimulationWrite` independently. Place the permitted simulated input in `writableTags`. Give HMI verification tag names an explicit prefix allowed by `runtimeTagPrefixes`. Choose an existing local directory for `fileRoot`.
+Edit `samples\workstation.local.json`:
 
-The build script emits `artifacts\Release\win-x64\SiemensEngineeringMcp.exe`. Keep its worker directories beside it.
+- Set `tiaVersion` to `21.0` or `21.1` and select the corresponding `tiaApiDirectory` (`PublicAPI\V21\net48` or `PublicAPI\V21.1\net48`).
+- Set `projectPath`, `plcPath` and `hmiPath` to your lab project and devices. Use drive-qualified local paths and an existing `fileRoot` for engineering file exchange.
+- Leave `portalProcessId` null to let the worker open the file privately. Set it only to inspect the matching project already open in the specified TIA Portal process.
+- Set `simApiPath` to the V9 x64 API DLL. Set `simInstance` to the exact name of a dedicated virtual PLC when testing simulation.
+- Keep `allowEngineeringWrite` and `allowSimulationWrite` false for inspection. For changes, use a separate profile and a closed disposable project copy. Populate `writableTags` with exact simulated input names and `runtimeTagPrefixes` with the approved HMI tag prefixes.
 
-## Client setup
+## Connect a client
 
-| Client | Apply the sample configuration |
-|---|---|
-| Claude Code | Merge `samples/claude-code.json` into the workspace `.mcp.json`. |
-| Cursor | Merge `samples/cursor.json` into `.cursor/mcp.json`. |
-| GitHub Copilot in VS Code | Merge `samples/copilot.json` into `.vscode/mcp.json`. |
-| Gemini CLI | Merge `samples/gemini.json` into `.gemini/settings.json`. |
-| ChatGPT | Run `samples/chatgpt-tunnel.ps1 -TunnelId <id>` using an authorised Secure MCP Tunnel. Start the tunnel client on this workstation and select the tunnel when adding the custom MCP in ChatGPT. [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) |
+Use the examples as templates. Replace both placeholder paths with the full local path to the built host and your local profile.
 
-Adjust the executable and profile paths in each sample. Run `doctor` first. It reports local prerequisites. Use `engineering_discover`, `sim_state` and `runtime_read` for live target checks. Keep the server session open during an engineering change so its private project and preview remain available.
+| Client | Configuration |
+| --- | --- |
+| Visual Studio 2026 GitHub Copilot | Merge [the Copilot sample](samples/copilot.json) into the workspace `.vs\mcp.json`. Use Copilot Chat in Agent mode. |
+| Cursor | Merge [the Cursor sample](samples/cursor.json) into the workspace `.cursor\mcp.json`. |
+| Codex CLI | Register the executable as a stdio MCP server with arguments `--profile` and the full path to the local profile. |
+| ChatGPT | Use a private Secure MCP Tunnel. Run [the tunnel setup script](samples/chatgpt-tunnel.ps1) with `-TunnelId` and your own tunnel ID. Optionally pass `-ServerExecutable` and `-WorkstationProfile`. Run the printed diagnostic and startup commands, confirm the client is polling successfully, and select the tunnel when adding the custom MCP server in ChatGPT. [Secure MCP Tunnel documentation](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) |
+
+The repository also has example registrations for [Claude Code](samples/claude-code.json) and [Gemini CLI](samples/gemini.json). These have not been qualified for this release.
+
+Start with `doctor`, then `engineering_discover`. For a read-only HMI check, use `hmi_discover` and `hmi_preview` and verify that the preview reports `changesApplied=false`. Keep credentials in a local secret store or the tunnel client's process environment. Local profiles, IDE registration files, logs, fixtures and tunnel state should stay outside the public repository.
+
+## Regression checks
+
+```powershell
+python .\tests\protocol_smoke.py
+python .\tests\journal_concurrency.py
+```
+
+The protocol test checks MCP discovery, input schemas and inspection-mode write denials without contacting Siemens SDKs. The journal test loads the installed PLCSIM V9 API and checks 40 denied requests across two hosts, including polling and replay. It uses an unregistered simulator name and a tag outside the write allowlist.
 
 ## Workstation acceptance
 
-Run this sequence on V21 and on V21.1 using separate project copies and a dedicated simulator. The fixture needs an existing SCL block called cyclically, a DB with a Boolean test input and a distinct derived output, a numeric revision value, a Unified PC device with an S7 connection and an existing screen with an I/O field. Seed a revision and known output rule before changes. Select a fresh revision number and HMI tag name for each run.
+Run independently on V21 and V21.1 with separate disposable projects. The fixture needs a cyclic SCL block, a Boolean test input and derived output, a PLC revision marker, and a Unified PC Runtime device with an S7 connection and an I/O field.
 
-1. Use `engineering_discover`, `plc_blocks`, `plc_read` and `hmi_discover` to identify targets. For the PLC change, use the complete SIMATIC source document returned by `plc_read`. Change the implementation to compute a known output from the fixture input and publish the fresh revision value. Keep the block identity and declaration intact.
-2. Call `plc_preview` and `hmi_preview`. For Unified, set the target property to `ProcessValue` on an existing I/O field and link an external HMI tag to the fixture output. Specify the HMI connection and, if required, its tag-table path. Inspect the previews before applying.
-3. Submit `plc_apply`, `hmi_apply`, `plc_compile`, `hmi_compile` and `engineering_save` in sequence. Give each action a distinct UUID in `requestId` and poll `operation_status` until it completes before continuing. Check compiler error counts before saving. Reusing a UUID with the same operation and arguments retrieves that request. An interrupted operation requires target readback before a new request.
-4. Call `engineering_reopen`, then `plc_read` and `hmi_read`. Compare the persisted source, the screen item's dynamic tag reference and the external tag's `PlcTag`, `Connection`, `PlcName` and `TagType` against the preview.
-5. Close the MCP session to release the project, perform the PLC and HMI downloads manually, and reconnect the client. Call `sim_refresh`. Confirm the expected PLC revision with `sim_read`, and the uniquely named HMI tag with `runtime_read`.
-6. Use `sim_write` with a fresh UUID per action to drive the fixture input false, true and false. After each action use `sim_wait` on the derived output and `runtime_read` on the corresponding HMI tag. Record both matching values and the HMI quality. Stop on a revision mismatch, bad quality or timeout. Screen rendering is outside this check.
+1. Read the SCL block and HMI binding. Preview a body-only SCL change and a binding to a uniquely named external HMI tag.
+2. Apply both previews, compile the PLC and HMI, and check both compiler results before saving. Reopen the project and compare the persisted source and binding with the previews.
+3. Close the engineering session. After the operator manually downloads both targets to the confirmed virtual PLC and compatible local Runtime, refresh the simulator tags and read the deployed revision and HMI verification tag.
+4. Drive the approved simulated input `false → true → false`. At each step verify the PLC-derived output and the HMI tag value, quality and timestamp. Stop on a revision mismatch, bad quality or timeout.
 
-Independently exercise wrong SDK selection, stale preview, invalid HMI binding, a competing writer, missing simulator instance, stale deployed revision and bad Runtime quality. From each client, discover the tools and configured target, preview a change and retrieve verification evidence. Run licensed bench checks after operator confirmation.
+Give each write, compile, save and reopen a fresh `requestId` UUID and poll `operation_status` before continuing. An identical request with the same UUID returns its recorded state. After an interruption, read back the target before retrying. The host holds a write lease on a changed target until the MCP session closes.
 
-The MCP process holds a write lease for each project or simulator it has changed until that session closes. Operation results are stored under the current user's local app data. If the host exits during a write, a reconnect can retrieve the interrupted status and determine the outcome by reading the target.
+## Verification status
+
+- **Passed:** V21 and V21.1 offline inspection, saved fixture readback and compile checks. An isolated Release bundle passed both regression scripts. Codex CLI completed V21 inspection, including HMI preview. Cursor completed V21 read-only discovery.
+- **Pending:** a complete MCP-driven edit, save and reopen run on each version, PLCSIM and Unified Runtime deployment checks, successful simulator-write replay, stale deployed revision and bad HMI quality checks. Also pending are current Visual Studio 2026 Agent Chat checks, Cursor HMI preview and successful calls from ChatGPT over the private tunnel.
