@@ -27,7 +27,15 @@ From the repository root in PowerShell, build the workstation bundle and copy th
 Copy-Item .\samples\workstation.example.json .\samples\workstation.local.json
 ```
 
-If the SDKs are installed outside the default directories, pass `-Tia21ApiDirectory`, `-Tia211ApiDirectory` and, when needed, `-PlcsimApiPath` to the build script. Keep the `workers` directory next to `artifacts\Release\win-x64\SiemensEngineeringMcp.exe`. Disconnect clients using that bundle before rebuilding it in place.
+The default output path is `artifacts\Release\win-x64`. Use that in-place path only when no client is using the bundle. Disconnect clients that load that executable before rebuilding it in place.
+
+When a client is already running, or for acceptance, publish a separate Release bundle to a new directory. The destination must not exist; the script stages beside it, verifies all five executables, then moves the staged directory into place:
+
+```powershell
+.\scripts\Build-Workstation.ps1 -OutputDirectory .\artifacts\Release\acceptance-20261125-0004
+```
+
+If the SDKs are installed outside the default directories, pass `-Tia21ApiDirectory`, `-Tia211ApiDirectory` and, when needed, `-PlcsimApiPath`. Keep each published bundle’s `workers` directory next to its `SiemensEngineeringMcp.exe`.
 
 Edit `samples\workstation.local.json`:
 
@@ -54,12 +62,41 @@ Start with `doctor`, then `engineering_discover`. For a read-only HMI check, use
 
 ## Regression checks
 
+Against the default in-place Release host:
+
 ```powershell
 python .\tests\protocol_smoke.py
 python .\tests\journal_concurrency.py
 ```
 
+Against a newly published bundle, pass the host executable:
+
+```powershell
+python .\tests\protocol_smoke.py .\artifacts\Release\acceptance-20261125-0004\SiemensEngineeringMcp.exe
+python .\tests\journal_concurrency.py .\artifacts\Release\acceptance-20261125-0004\SiemensEngineeringMcp.exe
+```
+
 The protocol test checks MCP discovery, input schemas and inspection-mode write denials without contacting Siemens SDKs. The journal test loads the installed PLCSIM V9 API and checks 40 denied requests across two hosts, including polling and replay. It uses an unregistered simulator name and a tag outside the write allowlist.
+
+## Offline write persistence
+
+Prove MCP-authored PLC and HMI changes survive save and reopen on disposable fixture copies. The runner copies the version fixture into an ignored run directory, generates a write-enabled profile with `portalProcessId` unset, then executes preview → apply → compile → save → reopen → readback. Source fixtures are never modified. Simulation and Runtime are not used.
+
+```powershell
+$bundle = '.\artifacts\Release\acceptance-20261125-0004\SiemensEngineeringMcp.exe'
+$profile = '.\session-state\files\workstation-v21-inspection.json'
+$run = '.\session-state\files\write-persistence-20261125-0004-r2'
+
+.\scripts\Run-OfflineWritePersistence.ps1 `
+  -HostExecutable $bundle `
+  -Profile $profile `
+  -RunDirectory $run `
+  -Version All
+```
+
+Defaults: V21 uses revision `21025` and HMI tag `McpVerify_21025`; V21.1 uses revision `21125` and HMI tag `McpVerify_21125`. Each version writes `write-persistence-report.json` under the run directory. Stop on the first failing step for that version.
+
+Observed on 2026-11-25: publish to `artifacts\Release\acceptance-20261125-0004` succeeded while Cursor held the in-place host (PID 51672); all 42 in-place file hashes stayed unchanged; reusing that output path was rejected before copying; protocol smoke and journal concurrency both exited 0 against the new host; V21 and V21.1 offline write persistence both passed (`21025` / `McpVerify_21025`, `21125` / `McpVerify_21125`) with zero PLC and HMI compile errors.
 
 ## Workstation acceptance
 
@@ -74,5 +111,9 @@ Give each write, compile, save and reopen a fresh `requestId` UUID and poll `ope
 
 ## Verification status
 
-- **Passed:** V21 and V21.1 offline inspection, saved fixture readback and compile checks. An isolated Release bundle passed both regression scripts. Codex CLI completed V21 inspection, including HMI preview. Cursor completed V21 read-only discovery.
-- **Pending:** a complete MCP-driven edit, save and reopen run on each version, PLCSIM and Unified Runtime deployment checks, successful simulator-write replay, stale deployed revision and bad HMI quality checks. Also pending are current Visual Studio 2026 Agent Chat checks, Cursor HMI preview and successful calls from ChatGPT over the private tunnel.
+- **Passed:** V21 and V21.1 offline inspection, saved fixture readback and compile checks. Codex CLI completed V21 inspection, including HMI preview. Engineering worker SDK discovery resolves non-default Program Files installs.
+- **Passed (2026-11-25):** separate Release publish to `artifacts\Release\acceptance-20261125-0004` while the Cursor in-place host stayed running; in-place hashes unchanged; existing output path rejected; all five executables present; protocol smoke and journal concurrency exited 0 against that host; offline write persistence passed on V21 (`21025` / `McpVerify_21025`) and V21.1 (`21125` / `McpVerify_21125`) with compile errors 0/0 and save/reopen readback.
+- **Cursor V21 read-only acceptance passed:** Agent Chat ran `doctor`, `engineering_discover` and `hmi_preview` against the qualified Release bundle. Both write flags were false and the preview returned `changesApplied=false`.
+- **Visual Studio 2026 Copilot blocked:** Agent Chat usage was exhausted. The Siemens MCP registration is ready for the three inspection calls once usage is available.
+- **ChatGPT blocked:** The private Secure MCP Tunnel is configured for the qualified Release bundle. The tunnel client was stopped at the last check. Successful polling and the three ChatGPT tool results are still pending.
+- **Still pending:** PLCSIM and Unified Runtime deployment checks, successful simulator-write replay, stale deployed revision and bad HMI quality checks.

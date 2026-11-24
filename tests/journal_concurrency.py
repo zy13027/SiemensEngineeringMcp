@@ -9,11 +9,12 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
-HOST = ROOT / "artifacts" / "Release" / "win-x64" / "SiemensEngineeringMcp.exe"
+DEFAULT_HOST = ROOT / "artifacts" / "Release" / "win-x64" / "SiemensEngineeringMcp.exe"
 STATE = Path(os.environ["LOCALAPPDATA"]) / "SiemensEngineeringMcp"
 
 
-def main():
+def main(host=DEFAULT_HOST):
+	host = Path(host).resolve()
 	instance = "MCP_NO_TARGET_" + uuid.uuid4().hex
 	requests = []
 	with tempfile.TemporaryDirectory(prefix="journal-test-", dir=ROOT / "tests") as temp:
@@ -23,10 +24,10 @@ def main():
 		profile_path = Path(temp) / "profile.json"
 		profile_path.write_text(json.dumps(profile), encoding="utf-8")
 		try:
-			with (subprocess.Popen([str(HOST), "--profile", str(profile_path)],
+			with (subprocess.Popen([str(host), "--profile", str(profile_path)],
 								   stdin=subprocess.PIPE, stdout=subprocess.PIPE,
 								   stderr=subprocess.DEVNULL, text=True, encoding="utf-8") as client,
-				  subprocess.Popen([str(HOST), "--profile", str(profile_path)],
+				  subprocess.Popen([str(host), "--profile", str(profile_path)],
 								   stdin=subprocess.PIPE, stdout=subprocess.PIPE,
 								   stderr=subprocess.DEVNULL, text=True, encoding="utf-8") as observer):
 				sequence = 0
@@ -94,4 +95,5 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+	import sys
+	main(DEFAULT_HOST if len(sys.argv) == 1 else Path(sys.argv[1]).resolve())
