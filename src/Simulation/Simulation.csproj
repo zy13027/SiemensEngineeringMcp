@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlcsimApiPath Condition="'$(PlcsimApiPath)' == ''">C:\Program Files (x86)\Common Files\Siemens\PLCSIMADV\API\9.0\Siemens.Simatic.Simulation.Runtime.Api.x64.dll</PlcsimApiPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\WorkerProtocol.cs" Link="WorkerProtocol.cs" />
+    <Reference Include="Siemens.Simatic.Simulation.Runtime.Api.x64" HintPath="$(PlcsimApiPath)" Private="false" />
+  </ItemGroup>
+</Project>

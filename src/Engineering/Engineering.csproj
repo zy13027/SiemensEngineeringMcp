@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TiaApiVersion Condition="'$(TiaApiVersion)' == ''">21.0</TiaApiVersion>
+    <DefaultTiaApiDirectory Condition="'$(TiaApiVersion)' == '21.0'">F:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48</DefaultTiaApiDirectory>
+    <DefaultTiaApiDirectory Condition="'$(TiaApiVersion)' == '21.1'">F:\Program Files\Siemens\Automation\Portal V21.1\PublicAPI\V21.1\net48</DefaultTiaApiDirectory>
+    <TiaApiDirectory Condition="'$(TiaApiDirectory)' == ''">$(DefaultTiaApiDirectory)</TiaApiDirectory>
+    <DefineConstants Condition="'$(TiaApiVersion)' == '21.1'">$(DefineConstants);TIA_21_1</DefineConstants>
+    <OutputPath>bin\$(Configuration)\$(TiaApiVersion)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\$(TiaApiVersion)\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\WorkerProtocol.cs" Link="WorkerProtocol.cs" />
+    <PackageReference Include="System.Text.Json" Version="10.0.10" />
+    <Reference Include="Siemens.Engineering.Base">
+      <HintPath>$(TiaApiDirectory)\Siemens.Engineering.Base.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.Step7">
+      <HintPath>$(TiaApiDirectory)\Siemens.Engineering.Step7.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.WinCCUnified">
+      <HintPath>$(TiaApiDirectory)\Siemens.Engineering.WinCCUnified.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="ValidateSiemensApi" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(TiaApiVersion)' != '21.0' And '$(TiaApiVersion)' != '21.1'" Text="TiaApiVersion must be 21.0 or 21.1." />
+    <Error Condition="!Exists('$(TiaApiDirectory)\Siemens.Engineering.Base.dll')" Text="Set TiaApiDirectory to the installed TIA $(TiaApiVersion) x64 PublicAPI net48 directory." />
+  </Target>
+</Project>

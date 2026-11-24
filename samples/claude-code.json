@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "siemens-engineering": {
+      "type": "stdio",
+      "command": "E:\\VS_Proj\\SiemensEngineeringMcp\\artifacts\\Release\\win-x64\\SiemensEngineeringMcp.exe",
+      "args": [
+        "--profile",
+        "E:\\VS_Proj\\SiemensEngineeringMcp\\samples\\workstation.local.json"
+      ]
+    }
+  }
+}

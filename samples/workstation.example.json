@@ -1,0 +1,19 @@
+{
+  "tiaVersion": "21.0",
+  "tiaApiDirectory": "F:\\Program Files\\Siemens\\Automation\\Portal V21\\PublicAPI\\V21\\net48",
+  "projectPath": "E:\\McpLab\\V21\\McpFixture.ap21",
+  "portalProcessId": null,
+  "plcPath": "PLC_1",
+  "hmiPath": "HMI_1",
+  "fileRoot": "E:\\McpLab\\Exchange",
+  "simApiPath": "C:\\Program Files (x86)\\Common Files\\Siemens\\PLCSIMADV\\API\\9.0\\Siemens.Simatic.Simulation.Runtime.Api.x64.dll",
+  "simInstance": "McpV21Fixture",
+  "allowEngineeringWrite": false,
+  "allowSimulationWrite": false,
+  "writableTags": [
+    "McpFixture.Input"
+  ],
+  "runtimeTagPrefixes": [
+    "McpVerify_"
+  ]
+}
